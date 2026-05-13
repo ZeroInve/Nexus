@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#030507"/>
+<title>NEXUS — Investment Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#030507;--bg2:#070d14;--bg3:#0d1520;--panel:rgba(10,18,28,.97);
+  --border:rgba(0,255,136,.09);--border2:rgba(0,255,136,.20);
+  --em:#00ff88;--em2:#00cc6a;--em-dim:rgba(0,255,136,.07);--em-glow:rgba(0,255,136,.25);
+  --red:#ff2d55;--red-dim:rgba(255,45,85,.09);
+  --blue:#00b4ff;--blue-dim:rgba(0,180,255,.09);
+  --gold:#ffb800;--gold-dim:rgba(255,184,0,.09);
+  --purple:#bf5fff;--purple-dim:rgba(191,95,255,.09);
+  --orange:#ff7c2a;--orange-dim:rgba(255,124,42,.09);
+  --text:#c8dce8;--text2:#4a6a80;--text3:#1e3040;
+  --mono:'Space Mono',monospace;--cond:'Barlow Condensed',sans-serif;--body:'Barlow',sans-serif;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow-x:hidden}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.02) 2px,rgba(0,0,0,.02) 4px)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef} = React;
+
+/* ═══════════════════════════════════════════════
+   NEXUS — Investment Intelligence Platform
+   Single unified app combining:
+   • Portfolio tracking (KLSE + US)
+   • AI Signal Agent (24/7 monitoring)
+   • Watchlist with full TA
+   • Insider Trading (SEC Form 4 / Bursa)
+   • Institutional Holdings (13D/13G >2%)
+   • Guru Portfolios
+   • Market Dashboard
+   • Transaction Log
+   • Alert History
+   Role: ANALYSE & SIGNAL → You trade manually in Moomoo/RHB
+═══════════════════════════════════════════════ */
+
+/* ── CSS ── */
+const injectCSS = () => {
+  const s = document.createElement('style');
+  s.textContent = `
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;backdrop-filter:blur(16px)}
+    .fade-in{animation:fadeIn .38s ease both}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .slide-in{animation:slideIn .32s cubic-bezier(.16,1,.3,1) both}
+    @keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+    .pulse{animation:pulseA 1.8s infinite}
+    @keyframes pulseA{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+    .row-h{transition:background .12s;cursor:pointer}
+    .row-h:hover{background:rgba(0,255,136,.03)!important}
+    .btn{border:none;cursor:pointer;font-family:var(--cond);font-weight:600;letter-spacing:.5px;transition:all .18s}
+    .btn:active{transform:scale(.95)}
+    .inp{background:rgba(0,255,136,.04);border:1px solid var(--border2);border-radius:6px;color:var(--text);
+      font-family:var(--mono);font-size:12px;padding:9px 12px;width:100%;outline:none;transition:border-color .2s,box-shadow .2s}
+    .inp:focus{border-color:var(--em);box-shadow:0 0 0 2px var(--em-dim)}
+    .inp::placeholder{color:var(--text3)}
+    select.inp option{background:#0d1520}
+    .chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;
+      font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+    .th{font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--text2)}
+    .rank-BUY{background:rgba(0,255,136,.12);color:var(--em);border:1px solid rgba(0,255,136,.3)}
+    .rank-SELL{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,45,85,.3)}
+    .rank-HOLD{background:var(--gold-dim);color:var(--gold);border:1px solid rgba(255,184,0,.3)}
+    .rank-WATCH{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(0,180,255,.3)}
+    .pill-buy{background:rgba(0,255,136,.12);color:var(--em);border:1px solid rgba(0,255,136,.25);border-radius:4px;padding:2px 7px;font-family:var(--cond);font-size:10px;font-weight:700}
+    .pill-sell{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,45,85,.25);border-radius:4px;padding:2px 7px;font-family:var(--cond);font-size:10px;font-weight:700}
+    .pill-hold{background:var(--gold-dim);color:var(--gold);border:1px solid rgba(255,184,0,.25);border-radius:4px;padding:2px 7px;font-family:var(--cond);font-size:10px;font-weight:700}
+    .sig-bar{height:3px;border-radius:99px;background:var(--bg3);overflow:hidden}
+    .sig-fill{height:100%;border-radius:99px;transition:width 1.2s cubic-bezier(.16,1,.3,1)}
+    .inst-bar{height:4px;border-radius:99px;background:var(--bg3);overflow:hidden;margin-top:3px}
+    .sec-hd{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:11px 16px;transition:background .12s}
+    .sec-hd:hover{background:rgba(0,255,136,.03)}
+    @keyframes tickerMove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .ticker-inner{display:flex;gap:44px;animation:tickerMove 32s linear infinite;width:max-content}
+    .ticker-inner:hover{animation-play-state:paused}
+    .toast{position:fixed;top:76px;right:14px;z-index:2000;max-width:300px;
+      background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:13px 15px;
+      box-shadow:0 8px 40px rgba(0,0,0,.6);animation:toastIn .4s cubic-bezier(.16,1,.3,1) both}
+    @keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+    .bottom-nav{display:none}
+    .top-nav{display:flex}
+    .hide-mob{display:block}
+    .mob-only{display:none}
+    .two-col{display:grid;grid-template-columns:330px 1fr;gap:14px}
+    .agent-grid{display:grid;grid-template-columns:300px 1fr;gap:12px}
+    .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .stats5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+    @media(max-width:980px){
+      .two-col,.agent-grid{grid-template-columns:1fr}
+      .hide-mob{display:none!important}
+      .mob-only{display:block!important}
+      .stats4,.stats5{grid-template-columns:repeat(2,1fr)}
+    }
+    @media(max-width:680px){
+      .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:500;
+        background:rgba(3,5,7,.97);border-top:1px solid var(--border2);
+        backdrop-filter:blur(20px);padding-bottom:env(safe-area-inset-bottom,8px);
+        padding-top:6px;justify-content:space-around}
+      .top-nav{display:none!important}
+      .main-wrap{padding:12px 12px 90px!important}
+      .hdr-inner{padding:10px 14px!important}
+      .ticker-bar{display:none!important}
+      .stats4,.stats5{grid-template-columns:repeat(2,1fr)}
+    }
+  `;
+  document.head.appendChild(s);
+};
+injectCSS();
+
+/* ════════════════ DATA ════════════════ */
+const STOCKS = [
+  /* Watchlist */
+  {id:1,symbol:"RHBBANK",name:"RHB Bank",mkt:"KLSE",type:"watch",price:5.82,prev:5.75,rsi:58,macd:0.12,ma50:5.60,ma200:5.40,vol:2.1,avgVol:1.8,pe:10.2,pbv:0.9,eps:0.57,divYield:5.8,roe:9.1,debtEq:0.8,sector:"Banking",mcap:"RM 23.4B",revenue:"RM 8.2B",support:5.47,resist:6.10},
+  {id:2,symbol:"TOPGLV",name:"Top Glove",mkt:"KLSE",type:"watch",price:0.79,prev:0.80,rsi:31,macd:-0.02,ma50:0.88,ma200:1.10,vol:8.4,avgVol:5.2,pe:null,pbv:0.6,eps:-0.04,divYield:0,roe:-2.1,debtEq:0.3,sector:"Healthcare",mcap:"RM 6.5B",revenue:"RM 2.1B",support:0.74,resist:0.91},
+  {id:3,symbol:"PETGAS",name:"Petronas Gas",mkt:"KLSE",type:"watch",price:17.40,prev:17.18,rsi:63,macd:0.28,ma50:16.80,ma200:16.20,vol:0.9,avgVol:0.8,pe:18.4,pbv:2.8,eps:0.95,divYield:4.8,roe:15.2,debtEq:0.1,sector:"Energy",mcap:"RM 34.4B",revenue:"RM 5.8B",support:16.60,resist:18.20},
+  {id:4,symbol:"META",name:"Meta Platforms",mkt:"NYSE",type:"watch",price:512.30,prev:503.20,rsi:71,macd:8.4,ma50:485.0,ma200:430.0,vol:18.2,avgVol:14.5,pe:24.8,pbv:7.2,eps:20.65,divYield:0.4,roe:31.8,debtEq:0.1,sector:"Technology",mcap:"$1.31T",revenue:"$134.9B",support:488.0,resist:538.0},
+  {id:5,symbol:"AMD",name:"Adv. Micro Devices",mkt:"NASDAQ",type:"watch",price:164.20,prev:165.80,rsi:45,macd:-1.2,ma50:168.0,ma200:155.0,vol:42.1,avgVol:38.5,pe:38.2,pbv:3.8,eps:4.29,divYield:0,roe:11.4,debtEq:0.04,sector:"Semiconductors",mcap:"$266B",revenue:"$22.7B",support:158.0,resist:174.0},
+  {id:6,symbol:"PLTR",name:"Palantir",mkt:"NYSE",type:"watch",price:22.85,prev:21.90,rsi:68,macd:0.9,ma50:20.50,ma200:18.20,vol:95.4,avgVol:72.1,pe:68.4,pbv:8.9,eps:0.33,divYield:0,roe:14.2,debtEq:0.0,sector:"AI/Software",mcap:"$49B",revenue:"$2.23B",support:20.80,resist:24.50},
+  /* Portfolio */
+  {id:7,symbol:"MAYBANK",name:"Malayan Banking",mkt:"KLSE",type:"port",price:9.12,prev:9.05,rsi:55,macd:0.18,ma50:8.85,ma200:8.60,vol:12.4,avgVol:10.8,pe:12.8,pbv:1.2,eps:0.71,divYield:6.4,roe:10.8,debtEq:1.1,sector:"Banking",mcap:"RM 107B",revenue:"RM 28.4B",support:8.80,resist:9.50,qty:1000,avgCost:8.45,div:0.58,broker:"RHB"},
+  {id:8,symbol:"TENAGA",name:"Tenaga Nasional",mkt:"KLSE",type:"port",price:10.85,prev:11.00,rsi:42,macd:-0.14,ma50:11.20,ma200:10.90,vol:5.2,avgVol:4.8,pe:14.2,pbv:1.0,eps:0.76,divYield:4.1,roe:7.4,debtEq:0.9,sector:"Utilities",mcap:"RM 62B",revenue:"RM 14.8B",support:10.50,resist:11.40,qty:500,avgCost:11.20,div:0.44,broker:"RHB"},
+  {id:9,symbol:"PBBANK",name:"Public Bank",mkt:"KLSE",type:"port",price:4.35,prev:4.28,rsi:52,macd:0.06,ma50:4.18,ma200:4.05,vol:8.2,avgVol:7.1,pe:13.4,pbv:1.5,eps:0.32,divYield:3.4,roe:12.1,debtEq:1.2,sector:"Banking",mcap:"RM 84B",revenue:"RM 12.8B",support:4.10,resist:4.55,qty:2000,avgCost:4.10,div:0.14,broker:"RHB"},
+  {id:10,symbol:"NVDA",name:"NVIDIA Corp",mkt:"NASDAQ",type:"port",price:875.40,prev:860.20,rsi:74,macd:18.4,ma50:780.0,ma200:620.0,vol:185.4,avgVol:142.0,pe:68.2,pbv:32.4,eps:12.85,divYield:0.04,roe:55.6,debtEq:0.4,sector:"Semiconductors",mcap:"$2.15T",revenue:"$60.9B",support:820.0,resist:920.0,qty:20,avgCost:485,div:0.04,broker:"Moomoo"},
+  {id:11,symbol:"AAPL",name:"Apple Inc",mkt:"NASDAQ",type:"port",price:192.35,prev:190.20,rsi:58,macd:2.1,ma50:185.0,ma200:172.0,vol:52.4,avgVol:48.1,pe:28.4,pbv:45.2,eps:6.77,divYield:0.6,roe:147.9,debtEq:1.8,sector:"Technology",mcap:"$2.97T",revenue:"$385.1B",support:184.0,resist:198.0,qty:15,avgCost:178,div:0.96,broker:"Moomoo"},
+  {id:12,symbol:"TSLA",name:"Tesla Inc",mkt:"NASDAQ",type:"port",price:178.60,prev:182.40,rsi:38,macd:-4.2,ma50:195.0,ma200:210.0,vol:120.8,avgVol:95.4,pe:42.8,pbv:8.4,eps:4.17,divYield:0,roe:18.2,debtEq:0.08,sector:"EV/Auto",mcap:"$568B",revenue:"$97.7B",support:165.0,resist:198.0,qty:25,avgCost:220,div:0,broker:"Moomoo"},
+];
+
+const INSIDER = {
+  MAYBANK:[{date:"2024-11-08",name:"Tan Sri Zamzamzairani",role:"Chairman",type:"BUY",shares:200000,price:9.05,value:"RM 1.81M",source:"Bursa 29A",filed:"2024-11-10"},{date:"2024-10-20",name:"Datuk Khairussaleh",role:"President/CEO",type:"BUY",shares:100000,price:8.92,value:"RM 892K",source:"Bursa 29A",filed:"2024-10-22"},{date:"2024-09-15",name:"Dato' Yvonne Chia",role:"Director",type:"SELL",shares:50000,price:9.14,value:"RM 457K",source:"Bursa 29A",filed:"2024-09-17"}],
+  TENAGA:[{date:"2024-10-30",name:"Dato' Megat Jalaluddin",role:"Chairman",type:"BUY",shares:80000,price:10.90,value:"RM 872K",source:"Bursa 29A",filed:"2024-11-01"},{date:"2024-09-22",name:"Datuk Ir. Baharin",role:"President/CEO",type:"BUY",shares:50000,price:11.10,value:"RM 555K",source:"Bursa 29A",filed:"2024-09-24"}],
+  PBBANK:[{date:"2024-11-02",name:"Tan Sri Teh Hong Piow",role:"Founder/Director",type:"BUY",shares:500000,price:4.28,value:"RM 2.14M",source:"Bursa 29A",filed:"2024-11-04"},{date:"2024-10-14",name:"Dato' Chang Kat Kiam",role:"MD/CEO",type:"BUY",shares:100000,price:4.18,value:"RM 418K",source:"Bursa 29A",filed:"2024-10-16"}],
+  RHBBANK:[{date:"2024-11-05",name:"Tan Sri Ahmad Badri",role:"Chairman",type:"BUY",shares:150000,price:5.70,value:"RM 855K",source:"Bursa 29A",filed:"2024-11-07"},{date:"2024-10-10",name:"Dato' Mohd Rashid",role:"Group MD/CEO",type:"BUY",shares:200000,price:5.58,value:"RM 1.12M",source:"Bursa 29A",filed:"2024-10-12"}],
+  TOPGLV:[{date:"2024-11-01",name:"Tan Sri Dr Lim Wee Chai",role:"Exec Chairman",type:"BUY",shares:5000000,price:0.77,value:"RM 3.85M",source:"Bursa 29A",filed:"2024-11-03"},{date:"2024-10-08",name:"Lim Cheong Guan",role:"MD",type:"BUY",shares:2000000,price:0.80,value:"RM 1.60M",source:"Bursa 29A",filed:"2024-10-10"}],
+  PETGAS:[{date:"2024-10-25",name:"Dato' Ab. Halim",role:"Chairman",type:"BUY",shares:30000,price:17.10,value:"RM 513K",source:"Bursa 29A",filed:"2024-10-27"},{date:"2024-09-18",name:"Dato' Nor Shuhaila",role:"Director",type:"SELL",shares:20000,price:17.50,value:"RM 350K",source:"Bursa 29A",filed:"2024-09-20"}],
+  NVDA:[{date:"2024-11-08",name:"Jensen Huang",role:"CEO",type:"SELL",shares:240000,price:870.40,value:"$208.9M",source:"SEC Form 4",filed:"2024-11-10"},{date:"2024-10-05",name:"Mark Stevens",role:"Director",type:"BUY",shares:10000,price:121.40,value:"$1.2M",source:"SEC Form 4",filed:"2024-10-07"},{date:"2024-09-15",name:"Jensen Huang",role:"CEO",type:"SELL",shares:600000,price:116.00,value:"$69.6M",source:"SEC Form 4",filed:"2024-09-17"}],
+  AAPL:[{date:"2024-11-06",name:"Tim Cook",role:"CEO",type:"SELL",shares:200000,price:192.10,value:"$38.4M",source:"SEC Form 4",filed:"2024-11-08"},{date:"2024-10-20",name:"Arthur Levinson",role:"Chairman",type:"BUY",shares:5000,price:188.40,value:"$942K",source:"SEC Form 4",filed:"2024-10-22"}],
+  TSLA:[{date:"2024-11-01",name:"Elon Musk",role:"CEO",type:"SELL",shares:5000000,price:180.20,value:"$901M",source:"SEC Form 4",filed:"2024-11-03"},{date:"2024-09-12",name:"James Murdoch",role:"Director",type:"BUY",shares:5000,price:232.40,value:"$1.2M",source:"SEC Form 4",filed:"2024-09-14"}],
+  META:[{date:"2024-11-10",name:"Mark Zuckerberg",role:"CEO",type:"SELL",shares:450000,price:560.40,value:"$252.2M",source:"SEC Form 4",filed:"2024-11-12"},{date:"2024-10-05",name:"Marc Andreessen",role:"Director",type:"BUY",shares:3000,price:567.80,value:"$1.7M",source:"SEC Form 4",filed:"2024-10-07"}],
+  AMD:[{date:"2024-11-05",name:"Lisa Su",role:"CEO",type:"SELL",shares:40000,price:168.40,value:"$6.7M",source:"SEC Form 4",filed:"2024-11-07"},{date:"2024-09-08",name:"Mark Papermaster",role:"CTO",type:"BUY",shares:8000,price:152.80,value:"$1.2M",source:"SEC Form 4",filed:"2024-09-10"}],
+  PLTR:[{date:"2024-11-12",name:"Alex Karp",role:"CEO",type:"SELL",shares:1200000,price:24.80,value:"$29.8M",source:"SEC Form 4",filed:"2024-11-14"},{date:"2024-09-25",name:"Stephen Cohen",role:"President",type:"BUY",shares:500000,price:18.60,value:"$9.3M",source:"SEC Form 4",filed:"2024-09-27"}],
+};
+
+const INSTITUTION = {
+  MAYBANK:[{name:"Amanah Saham Bumiputera",type:"Passive",pct:49.1,change:"+0.00%",stance:"HOLD",source:"Bursa 13D",filed:"2024-Q3"},{name:"Employees Provident Fund",type:"Active",pct:14.22,change:"+0.18%",stance:"BUY",source:"Bursa 13D",filed:"2024-Q3"},{name:"KWAP",type:"Active",pct:6.84,change:"+0.05%",stance:"BUY",source:"Bursa 13D",filed:"2024-Q3"},{name:"Permodalan Nasional",type:"Passive",pct:5.12,change:"-0.10%",stance:"HOLD",source:"Bursa 13D",filed:"2024-Q3"}],
+  TENAGA:[{name:"Khazanah Nasional",type:"Strategic",pct:32.08,change:"0.00%",stance:"HOLD",source:"Bursa 13D",filed:"2024-Q3"},{name:"Employees Provident Fund",type:"Active",pct:16.44,change:"+0.22%",stance:"BUY",source:"Bursa 13D",filed:"2024-Q3"},{name:"KWAP",type:"Active",pct:8.20,change:"+0.12%",stance:"BUY",source:"Bursa 13D",filed:"2024-Q3"}],
+  PBBANK:[{name:"Tan Sri Teh Hong Piow",type:"Strategic",pct:23.18,change:"+0.05%",stance:"BUY",source:"Bursa 13D",filed:"2024-Q3"},{name:"Employees Provident Fund",type:"Active",pct:14.80,change:"+0.10%",stance:"BUY",source:"Bursa 13D",filed:"2024-Q3"},{name:"KWAP",type:"Active",pct:5.92,change:"+0.04%",stance:"BUY",source:"Bursa 13D",filed:"2024-Q3"}],
+  NVDA:[{name:"The Vanguard Group",type:"Passive",pct:8.42,change:"+0.12%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"BlackRock Inc.",type:"Passive",pct:7.18,change:"+0.08%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"FMR LLC (Fidelity)",type:"Active",pct:4.21,change:"+0.45%",stance:"BUY",source:"SEC 13G",filed:"2024-Q3"},{name:"State Street Global",type:"Passive",pct:3.89,change:"-0.11%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"}],
+  AAPL:[{name:"The Vanguard Group",type:"Passive",pct:9.11,change:"+0.06%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"BlackRock Inc.",type:"Passive",pct:7.44,change:"+0.09%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"Berkshire Hathaway",type:"Active",pct:5.90,change:"-0.22%",stance:"SELL",source:"SEC 13G",filed:"2024-Q3"},{name:"State Street Global",type:"Passive",pct:3.72,change:"-0.08%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"}],
+  TSLA:[{name:"The Vanguard Group",type:"Passive",pct:7.44,change:"-0.22%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"BlackRock Inc.",type:"Passive",pct:5.92,change:"-0.18%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"Baillie Gifford",type:"Active",pct:2.82,change:"-0.94%",stance:"SELL",source:"SEC 13G",filed:"2024-Q3"}],
+  META:[{name:"The Vanguard Group",type:"Passive",pct:7.21,change:"+0.09%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"BlackRock Inc.",type:"Passive",pct:6.84,change:"+0.14%",stance:"HOLD",source:"SEC 13G",filed:"2024-Q3"},{name:"FMR LLC (Fidelity)",type:"Active",pct:4.10,change:"+0.62%",stance:"BUY",source:"SEC 13G",filed:"2024-Q3"},{name:"T. Rowe Price",type:"Active",pct:2.45,change:"+0.31%",stance:"BUY",source:"SEC 13G",filed:"2024-Q3"}],
+};
+
+const GURUS_DATA = {
+  buffett:{name:"Warren Buffett",label:"Berkshire Hathaway",emoji:"🧓",color:"#f5c842",bio:"Value investing legend. 60-year track record. Buys undervalued businesses with durable moats.",cagr:"~20%",style:"Value / Concentrated",h:[{s:"AAPL",p:46.2,v:"174.3B"},{s:"BAC",p:9.1,v:"34.3B"},{s:"AXP",p:8.4,v:"31.7B"},{s:"KO",p:6.8,v:"25.6B"},{s:"CVX",p:5.9,v:"22.3B"},{s:"OXY",p:4.2,v:"15.8B"}],url:"https://www.dataroma.com/m/holdings.php?m=BRK"},
+  cathie:{name:"Cathie Wood",label:"ARK Invest",emoji:"🚀",color:"#bf5fff",bio:"Disruptive innovation focus. AI, genomics, fintech, robotics, and space exploration.",cagr:"~25% (peak)",style:"Growth / Thematic",h:[{s:"TSLA",p:12.4,v:"1.2B"},{s:"COIN",p:9.8,v:"0.95B"},{s:"ROKU",p:7.2,v:"0.70B"},{s:"BEAM",p:6.5,v:"0.63B"},{s:"PATH",p:5.9,v:"0.57B"},{s:"SHOP",p:5.1,v:"0.49B"}],url:"https://ark-funds.com/funds/arkk/"},
+  pelosi:{name:"Nancy Pelosi",label:"Congressional Trades",emoji:"🏛️",color:"#3b9eff",bio:"Tracked via STOCK Act disclosures. Concentrated in US tech mega-caps and semiconductors.",cagr:"~65% (2023)",style:"Growth / Tech",h:[{s:"NVDA",p:22.1,v:"8.2M"},{s:"AAPL",p:14.3,v:"5.3M"},{s:"MSFT",p:11.6,v:"4.3M"},{s:"GOOG",p:9.4,v:"3.5M"},{s:"TSLA",p:8.7,v:"3.2M"},{s:"AMD",p:7.2,v:"2.7M"}],url:"https://www.quiverquant.com/sources/congresstrading"},
+};
+
+const INDICES=[{n:"KLCI",v:"1,532",c:"+0.34%",up:true},{n:"S&P500",v:"5,248",c:"+0.51%",up:true},{n:"NASDAQ",v:"16,421",c:"+0.78%",up:true},{n:"DOW",v:"39,114",c:"-0.12%",up:false},{n:"USD/MYR",v:"4.71",c:"+0.05%",up:true},{n:"Gold",v:"2,326",c:"+0.92%",up:true},{n:"Oil",v:"82.41",c:"-0.33%",up:false},{n:"BTC",v:"62,840",c:"+2.14%",up:true}];
+
+const TXNS_INIT=[
+  {date:"2024-05-01",type:"BUY",symbol:"NVDA",qty:5,price:820.00,broker:"Moomoo"},
+  {date:"2024-04-15",type:"DIV",symbol:"MAYBANK",qty:0,price:580.00,broker:"RHB"},
+  {date:"2024-04-02",type:"SELL",symbol:"TSLA",qty:10,price:195.00,broker:"Moomoo"},
+  {date:"2024-03-18",type:"BUY",symbol:"PBBANK",qty:500,price:4.10,broker:"RHB"},
+  {date:"2024-03-10",type:"DIV",symbol:"TENAGA",qty:0,price:220.00,broker:"RHB"},
+];
+
+/* ════════════════ HELPERS ════════════════ */
+const f2=n=>n?.toLocaleString("en",{minimumFractionDigits:2,maximumFractionDigits:2})??"—";
+const f1=n=>n?.toLocaleString("en",{minimumFractionDigits:1,maximumFractionDigits:1})??"—";
+const f0=n=>n?.toLocaleString("en",{maximumFractionDigits:0})??"—";
+const fP=(p,m)=>m==="KLSE"?`RM ${f2(p)}`:`$${f2(p)}`;
+const USD=4.71;
+const rankColor=r=>r==="BUY"?"var(--em)":r==="SELL"?"var(--red)":r==="HOLD"?"var(--gold)":"var(--blue)";
+
+/* ════════════════ SIGNAL ENGINE ════════════════ */
+function computeSignal(s){
+  let tech=0,fund=0,sigs=[];
+  if(s.rsi<30){tech+=18;sigs.push({t:"BULL",cat:"Technical",msg:`RSI ${s.rsi} — Oversold. Strong bounce potential.`});}
+  else if(s.rsi<45){tech+=8;sigs.push({t:"BULL",cat:"Technical",msg:`RSI ${s.rsi} — Approaching oversold. Watch for entry.`});}
+  else if(s.rsi>70){tech-=18;sigs.push({t:"BEAR",cat:"Technical",msg:`RSI ${s.rsi} — Overbought. Consider taking profit.`});}
+  else if(s.rsi>60){tech+=5;sigs.push({t:"BULL",cat:"Technical",msg:`RSI ${s.rsi} — Bullish momentum building.`});}
+  if(s.macd>0){tech+=12;sigs.push({t:"BULL",cat:"Technical",msg:`MACD +${f2(s.macd)} — Bullish crossover confirmed.`});}
+  else{tech-=10;sigs.push({t:"BEAR",cat:"Technical",msg:`MACD ${f2(s.macd)} — Bearish. Downward momentum.`});}
+  const a50=s.price>s.ma50,a200=s.price>s.ma200;
+  if(a50&&a200){tech+=14;sigs.push({t:"BULL",cat:"Technical",msg:`Above 50MA & 200MA. Strong uptrend confirmed.`});}
+  else if(!a50&&!a200){tech-=14;sigs.push({t:"BEAR",cat:"Technical",msg:`Below 50MA & 200MA. Downtrend confirmed.`});}
+  else if(a50){tech+=6;sigs.push({t:"BULL",cat:"Technical",msg:`Above 50MA — short-term bullish.`});}
+  else{tech-=6;sigs.push({t:"BEAR",cat:"Technical",msg:`Below 50MA — short-term bearish.`});}
+  const vr=s.vol/s.avgVol;
+  if(vr>1.5){tech+=6;sigs.push({t:"BULL",cat:"Technical",msg:`Volume ${f1(vr)}x avg — Strong conviction behind move.`});}
+  const chgPct=((s.price-s.prev)/s.prev)*100;
+  if(chgPct>1.5)tech+=5; else if(chgPct<-1.5)tech-=5;
+  if(s.pe){
+    if(s.pe<12){fund+=15;sigs.push({t:"BULL",cat:"Fundamental",msg:`PE ${s.pe}x — Undervalued. Strong value opportunity.`});}
+    else if(s.pe<20){fund+=8;sigs.push({t:"BULL",cat:"Fundamental",msg:`PE ${s.pe}x — Fairly valued. Reasonable entry.`});}
+    else if(s.pe>50){fund-=10;sigs.push({t:"BEAR",cat:"Fundamental",msg:`PE ${s.pe}x — Expensive. Priced for perfection.`});}
+    else if(s.pe>30)fund-=4;
+  }else{fund-=8;sigs.push({t:"BEAR",cat:"Fundamental",msg:`No positive earnings — not yet profitable.`});}
+  if(s.divYield>5){fund+=12;sigs.push({t:"BULL",cat:"Fundamental",msg:`Div yield ${s.divYield}% — High income. Defensive holding.`});}
+  else if(s.divYield>3){fund+=6;sigs.push({t:"BULL",cat:"Fundamental",msg:`Div yield ${s.divYield}% — Healthy income stream.`});}
+  if(s.roe>20){fund+=10;sigs.push({t:"BULL",cat:"Fundamental",msg:`ROE ${s.roe}% — Excellent capital efficiency.`});}
+  else if(s.roe>10){fund+=5;sigs.push({t:"BULL",cat:"Fundamental",msg:`ROE ${s.roe}% — Good returns on equity.`});}
+  else if(s.roe<0){fund-=12;sigs.push({t:"BEAR",cat:"Fundamental",msg:`ROE ${s.roe}% — Loss-making.`});}
+  if(s.pbv<1){fund+=8;sigs.push({t:"BULL",cat:"Fundamental",msg:`P/BV ${s.pbv}x — Below book value. Deep value.`});}
+  else if(s.pbv<2)fund+=4;
+  if(s.debtEq<0.3)fund+=5; else if(s.debtEq>1.5){fund-=5;sigs.push({t:"BEAR",cat:"Fundamental",msg:`Debt/Equity ${s.debtEq}x — High leverage risk.`});}
+  const total=Math.max(-100,Math.min(100,tech+fund));
+  const tN=Math.max(0,Math.min(100,50+tech));
+  const fN=Math.max(0,Math.min(100,50+fund));
+  let rank,conf;
+  if(total>=35){rank="BUY";conf=Math.min(95,60+total);}
+  else if(total>=10){rank="WATCH";conf=Math.min(80,50+total);}
+  else if(total<=-25){rank="SELL";conf=Math.min(90,60+Math.abs(total));}
+  else{rank="HOLD";conf=Math.min(75,50+Math.abs(total));}
+  const entry=parseFloat((rank==="BUY"||rank==="WATCH"?s.price*.995:s.price*1.005).toFixed(s.price>10?2:3));
+  const sl=parseFloat((rank==="BUY"||rank==="WATCH"?s.price*.94:s.price*1.06).toFixed(s.price>10?2:3));
+  const tp1=parseFloat((rank==="BUY"||rank==="WATCH"?s.price*1.08:s.price*.92).toFixed(s.price>10?2:3));
+  const tp2=parseFloat((rank==="BUY"||rank==="WATCH"?s.price*1.18:s.price*.85).toFixed(s.price>10?2:3));
+  const rr=parseFloat((Math.abs(tp1-entry)/Math.abs(entry-sl)).toFixed(2));
+  return{rank,conf:Math.round(conf),total,tN,fN,sigs,entry,sl,tp1,tp2,rr,chgPct};
+}
+
+/* ════════════════ ATOMS ════════════════ */
+function ScoreRing({score,color,size=52}){
+  const r=(size/2)-5,circ=2*Math.PI*r,fill=circ*(1-score/100);
+  return React.createElement('svg',{width:size,height:size,style:{transform:"rotate(-90deg)"}},
+    React.createElement('circle',{cx:size/2,cy:size/2,r,fill:"none",stroke:"var(--bg3)",strokeWidth:4}),
+    React.createElement('circle',{cx:size/2,cy:size/2,r,fill:"none",stroke:color,strokeWidth:4,strokeDasharray:circ,strokeDashoffset:fill,strokeLinecap:"round",style:{transition:"stroke-dashoffset 1.2s cubic-bezier(.16,1,.3,1)"}}),
+    React.createElement('text',{x:size/2,y:size/2+1,textAnchor:"middle",dominantBaseline:"middle",style:{transform:`rotate(90deg) translate(0,-${size/2}px)`,transformOrigin:`${size/2}px ${size/2}px`,fontFamily:"var(--mono)",fontSize:size>48?13:10,fontWeight:700,fill:color}},score)
+  );
+}
+
+function SectionBlock({title,color,icon,badge,children,defaultOpen=true}){
+  const [open,setOpen]=useState(defaultOpen);
+  return React.createElement('div',{style:{borderBottom:"1px solid var(--border)"}},
+    React.createElement('div',{className:"sec-hd",onClick:()=>setOpen(v=>!v)},
+      React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}},
+        React.createElement('span',{style:{fontSize:13}},icon),
+        React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:11,fontWeight:700,letterSpacing:1.5,color}},title.toUpperCase()),
+        badge&&React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:8,color:"var(--text2)",background:"var(--bg3)",padding:"1px 5px",borderRadius:4}},badge)
+      ),
+      React.createElement('span',{style:{color:"var(--text2)",fontSize:11,fontFamily:"var(--mono)"}},open?"▲":"▼")
+    ),
+    open&&React.createElement('div',{style:{padding:"0 16px 14px"}},children)
+  );
+}
+
+function Toast({t}){
+  const rc=rankColor(t.rank);
+  return React.createElement('div',{className:"toast",style:{borderColor:rc+"44"}},
+    React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}},
+      React.createElement('div',{className:"pulse",style:{width:7,height:7,borderRadius:"50%",background:rc,boxShadow:`0 0 7px ${rc}`}}),
+      React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:12,color:rc,letterSpacing:1}},t.rank+" SIGNAL"),
+      React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:14,color:"var(--text)",marginLeft:4}},t.symbol)
+    ),
+    React.createElement('div',{style:{fontSize:11,color:"var(--text2)",lineHeight:1.4,marginBottom:8}},t.reason),
+    React.createElement('div',{style:{display:"flex",gap:14}},
+      [["Entry",t.entry,rc],["SL",t.sl,"var(--red)"],["TP",t.tp,"var(--em)"]].map(([l,v,c])=>
+        React.createElement('span',{key:l,style:{fontFamily:"var(--mono)",fontSize:9,color:"var(--text3)"}},
+          l+" ",React.createElement('span',{style:{color:c,fontWeight:700}},v)
+        )
+      )
+    )
+  );
+}
+
+/* ════════════════ SIGNAL DETAIL PANEL ════════════════ */
+function SignalPanel({stock,sig,onClose}){
+  const rc=rankColor(sig.rank);
+  const bulls=sig.sigs.filter(s=>s.t==="BULL");
+  const bears=sig.sigs.filter(s=>s.t==="BEAR");
+  const chgUp=sig.chgPct>=0;
+  const isPort=stock.type==="port";
+  const insiderData=INSIDER[stock.symbol]||[];
+  const instData=INSTITUTION[stock.symbol]||[];
+  const isKLSE=stock.mkt==="KLSE";
+  const insiderSrc=isKLSE?"Bursa Form 29A":"SEC Form 4";
+  const instSrc=isKLSE?"Bursa 13D":"SEC 13D/13G";
+  const insiderUrl=isKLSE?`https://www.bursamalaysia.com/market_information/announcements/company_announcement?stock_code=${stock.symbol}`:`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${stock.symbol}&type=4&dateb=&owner=include&count=20`;
+  const instUrl=isKLSE?`https://www.bursamalaysia.com/market_information/announcements/company_announcement?stock_code=${stock.symbol}`:`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${stock.symbol}&type=13&dateb=&owner=include&count=20`;
+
+  const insiderBuys=insiderData.filter(d=>d.type==="BUY").length;
+  const insiderSells=insiderData.filter(d=>d.type==="SELL").length;
+  const instBuys=instData.filter(d=>d.stance==="BUY").length;
+  const instSells=instData.filter(d=>d.stance==="SELL").length;
+  const instTotal=instData.reduce((a,d)=>a+d.pct,0);
+
+  const box=(label,value,color="var(--text)")=>React.createElement('div',{style:{background:"var(--bg3)",borderRadius:6,padding:"7px 10px"}},
+    React.createElement('div',{className:"th",style:{marginBottom:2}},label),
+    React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:700,color}},value)
+  );
+
+  return React.createElement('div',{className:"card slide-in",style:{borderColor:rc+"28",overflowY:"auto",maxHeight:"88vh"}},
+    /* Header */
+    React.createElement('div',{style:{padding:"16px 16px 12px",borderBottom:"1px solid var(--border)"}},
+      React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}},
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:20,color:"var(--text)"}},stock.symbol),
+          React.createElement('div',{style:{fontSize:11,color:"var(--text2)",fontFamily:"var(--cond)"}},stock.name," · ",React.createElement('span',{style:{color:"var(--blue)"}},stock.mkt)," · ",stock.sector)
+        ),
+        React.createElement('div',{style:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}},
+          React.createElement('span',{className:`chip rank-${sig.rank}`,style:{fontSize:13,padding:"4px 12px"}},sig.rank),
+          React.createElement('button',{onClick:onClose,className:"btn",style:{padding:"2px 8px",borderRadius:4,background:"var(--bg3)",color:"var(--text2)",fontSize:10}},"✕ close")
+        )
+      ),
+      React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:24,fontWeight:700,marginBottom:3}},fP(stock.price,stock.mkt)),
+      React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,color:chgUp?"var(--em)":"var(--red)",fontWeight:700,marginBottom:10}},chgUp?"▲":"▼"," ",Math.abs(sig.chgPct).toFixed(2),"% today"),
+      isPort&&stock.qty&&React.createElement('div',{style:{padding:"8px 10px",background:"var(--bg3)",borderRadius:6,display:"flex",justifyContent:"space-between",marginBottom:10}},
+        React.createElement('div',null,
+          React.createElement('div',{className:"th",style:{marginBottom:2}},"YOUR POSITION — EXECUTE VIA ",stock.broker.toUpperCase()),
+          React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,color:"var(--text)"}},f0(stock.qty)," shares @ ",fP(stock.avgCost,stock.mkt))
+        ),
+        React.createElement('div',{style:{textAlign:"right"}},
+          React.createElement('div',{className:"th",style:{marginBottom:2}},"UNREALISED P&L"),
+          React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:700,color:(stock.price-stock.avgCost)>=0?"var(--em)":"var(--red)"}},
+            (stock.price-stock.avgCost)>=0?"+":"",fP((stock.price-stock.avgCost)*stock.qty,stock.mkt))
+        )
+      ),
+      React.createElement('div',{style:{display:"flex",justifyContent:"space-around"}},
+        [["Overall",sig.conf,rc],["Technical",sig.tN,"var(--blue)"],["Fundamental",sig.fN,"var(--gold)"]].map(([l,v,c])=>
+          React.createElement('div',{key:l,style:{textAlign:"center"}},
+            React.createElement(ScoreRing,{score:v,color:c,size:52}),
+            React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:9,color:"var(--text2)",marginTop:3,letterSpacing:1}},l.toUpperCase())
+          )
+        )
+      )
+    ),
+
+    /* 1. Trade Levels */
+    React.createElement(SectionBlock,{title:"Trade Levels — Execute in Moomoo / RHB",color:"var(--em)",icon:"🎯",defaultOpen:true},
+      React.createElement('div',{style:{padding:"8px 10px",background:"rgba(0,255,136,.06)",border:"1px solid rgba(0,255,136,.15)",borderRadius:6,marginBottom:8}},
+        React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:10,color:"var(--em)",letterSpacing:1}},
+          "⚡ SIGNAL GENERATED — Open ",isKLSE?"RHB TradeSmart":"Moomoo"," and execute the trade below"
+        )
+      ),
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}},
+        [["Entry Price",fP(sig.entry,stock.mkt),rc],["Stop Loss",fP(sig.sl,stock.mkt),"var(--red)"],["Target 1 (+8%)",fP(sig.tp1,stock.mkt),"var(--em)"],["Target 2 (+18%)",fP(sig.tp2,stock.mkt),"var(--em2)"]].map(([l,v,c])=>
+          React.createElement('div',{key:l,style:{background:"var(--bg3)",borderRadius:6,padding:"8px 10px"}},
+            React.createElement('div',{className:"th",style:{marginBottom:2}},l),
+            React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:13,fontWeight:700,color:c}},v)
+          )
+        )
+      ),
+      React.createElement('div',{style:{display:"flex",justifyContent:"space-between",padding:"6px 10px",background:"var(--bg3)",borderRadius:6}},
+        React.createElement('span',{className:"th"},"RISK / REWARD RATIO"),
+        React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:12,fontWeight:700,color:sig.rr>=2?"var(--em)":sig.rr>=1.5?"var(--gold)":"var(--red)"}},`1 : ${sig.rr}`)
+      )
+    ),
+
+    /* 2. Technical */
+    React.createElement(SectionBlock,{title:"Technical Analysis",color:"var(--blue)",icon:"📈",defaultOpen:false},
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}},
+        [["RSI (14)",stock.rsi,stock.rsi>70?"var(--red)":stock.rsi<30?"var(--em)":"var(--gold)"],
+         ["MACD",stock.macd>=0?"+"+f2(stock.macd):f2(stock.macd),stock.macd>=0?"var(--em)":"var(--red)"],
+         ["50-Day MA",f2(stock.ma50),stock.price>stock.ma50?"var(--em)":"var(--red)"],
+         ["200-Day MA",f2(stock.ma200),stock.price>stock.ma200?"var(--em)":"var(--red)"],
+         ["Volume",f1(stock.vol)+"M",stock.vol>stock.avgVol?"var(--em)":"var(--text2)"],
+         ["Avg Volume",f1(stock.avgVol)+"M","var(--text2)"]].map(([l,v,c])=>box(l,v,c))
+      ),
+      bulls.filter(s=>s.cat==="Technical").map((s,i)=>React.createElement('div',{key:i,style:{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bg3)"}},React.createElement('span',{style:{color:"var(--em)",fontSize:9,flexShrink:0}},"▲"),React.createElement('span',{style:{fontSize:11,color:"var(--text)",lineHeight:1.4}},s.msg))),
+      bears.filter(s=>s.cat==="Technical").map((s,i)=>React.createElement('div',{key:i,style:{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bg3)"}},React.createElement('span',{style:{color:"var(--red)",fontSize:9,flexShrink:0}},"▼"),React.createElement('span',{style:{fontSize:11,color:"var(--text)",lineHeight:1.4}},s.msg)))
+    ),
+
+    /* 3. Fundamental */
+    React.createElement(SectionBlock,{title:"Fundamental Analysis",color:"var(--gold)",icon:"📊",defaultOpen:false},
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}},
+        [["PE Ratio",stock.pe?stock.pe+"x":"N/A",stock.pe&&stock.pe<20?"var(--em)":stock.pe&&stock.pe>40?"var(--red)":"var(--text)"],
+         ["P/Book",stock.pbv+"x",stock.pbv<1.5?"var(--em)":"var(--text)"],
+         ["ROE",stock.roe+"%",stock.roe>15?"var(--em)":stock.roe<0?"var(--red)":"var(--text)"],
+         ["Div Yield",stock.divYield?stock.divYield+"%":"—",stock.divYield>4?"var(--em)":"var(--text)"],
+         ["EPS",stock.eps?(isKLSE?"RM ":"$")+f2(stock.eps):"N/A",stock.eps>0?"var(--em)":"var(--red)"],
+         ["Debt/Equity",stock.debtEq+"x",stock.debtEq<0.5?"var(--em)":stock.debtEq>1.2?"var(--red)":"var(--text)"],
+         ["Mkt Cap",stock.mcap,"var(--text)"],["Revenue",stock.revenue,"var(--text)"]].map(([l,v,c])=>box(l,v,c))
+      ),
+      bulls.filter(s=>s.cat==="Fundamental").map((s,i)=>React.createElement('div',{key:i,style:{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bg3)"}},React.createElement('span',{style:{color:"var(--em)",fontSize:9,flexShrink:0}},"▲"),React.createElement('span',{style:{fontSize:11,color:"var(--text)",lineHeight:1.4}},s.msg))),
+      bears.filter(s=>s.cat==="Fundamental").map((s,i)=>React.createElement('div',{key:i,style:{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid var(--bg3)"}},React.createElement('span',{style:{color:"var(--red)",fontSize:9,flexShrink:0}},"▼"),React.createElement('span',{style:{fontSize:11,color:"var(--text)",lineHeight:1.4}},s.msg)))
+    ),
+
+    /* 4. Support & Resistance */
+    React.createElement(SectionBlock,{title:"Support & Resistance",color:"var(--text2)",icon:"🔲",defaultOpen:false},
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}},
+        [["Resistance",fP(stock.resist,stock.mkt),"var(--red)","var(--red-dim)"],
+         ["Support",fP(stock.support,stock.mkt),"var(--em)","var(--em-dim)"],
+         ["50-Day MA",fP(stock.ma50,stock.mkt),stock.price>stock.ma50?"var(--em)":"var(--red)","var(--bg3)"],
+         ["200-Day MA",fP(stock.ma200,stock.mkt),stock.price>stock.ma200?"var(--em)":"var(--red)","var(--bg3)"]].map(([l,v,c,bg])=>
+          React.createElement('div',{key:l,style:{background:bg,borderRadius:6,padding:"8px 10px",border:`1px solid ${c}22`}},
+            React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:9,color:c,letterSpacing:1,marginBottom:2}},l),
+            React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:12,fontWeight:700,color:c}},v)
+          )
+        )
+      ),
+      React.createElement('div',{style:{background:"var(--bg3)",borderRadius:6,padding:"8px 10px"}},
+        React.createElement('div',{className:"th",style:{marginBottom:5}},"PRICE POSITION"),
+        React.createElement('div',{style:{position:"relative",height:6,borderRadius:99,background:"var(--border)"}},
+          (()=>{const range=stock.resist-stock.support;const pos=Math.max(2,Math.min(98,((stock.price-stock.support)/range)*100));
+            return React.createElement(React.Fragment,null,
+              React.createElement('div',{style:{position:"absolute",left:`${pos}%`,top:"50%",transform:"translate(-50%,-50%)",width:10,height:10,borderRadius:"50%",background:"var(--em)",boxShadow:"0 0 8px var(--em)",zIndex:2}}),
+              React.createElement('div',{style:{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",width:2,height:12,background:"var(--em)",borderRadius:99}}),
+              React.createElement('div',{style:{position:"absolute",right:0,top:"50%",transform:"translateY(-50%)",width:2,height:12,background:"var(--red)",borderRadius:99}})
+            );
+          })()
+        ),
+        React.createElement('div',{style:{display:"flex",justifyContent:"space-between",marginTop:4}},
+          React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:8,color:"var(--em)"}},fP(stock.support,stock.mkt)),
+          React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:9,fontWeight:700}},fP(stock.price,stock.mkt)),
+          React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:8,color:"var(--red)"}},fP(stock.resist,stock.mkt))
+        )
+      )
+    ),
+
+    /* 5. Insider Trading */
+    React.createElement(SectionBlock,{title:"Insider Trading",color:"var(--orange)",icon:"👤",badge:`${insiderData.length} trades · 6 months`,defaultOpen:false},
+      insiderData.length===0
+        ? React.createElement('div',{style:{padding:"10px 0",color:"var(--text2)",fontFamily:"var(--cond)",fontSize:11,letterSpacing:1}},"NO DATA AVAILABLE")
+        : React.createElement(React.Fragment,null,
+            React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}},
+              [["Buys",insiderBuys,"var(--em)"],["Sells",insiderSells,"var(--red)"],["Sentiment",insiderBuys>insiderSells?"BULLISH":insiderBuys<insiderSells?"BEARISH":"NEUTRAL",insiderBuys>insiderSells?"var(--em)":insiderBuys<insiderSells?"var(--red)":"var(--gold)"]].map(([l,v,c])=>
+                React.createElement('div',{key:l,style:{background:"var(--bg3)",borderRadius:6,padding:"8px",textAlign:"center"}},
+                  React.createElement('div',{className:"th",style:{marginBottom:2}},l),
+                  React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:700,color:c}},v)
+                )
+              )
+            ),
+            React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+              React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:9,fontWeight:700,color:"var(--orange)",background:"var(--orange-dim)",border:"1px solid rgba(255,124,42,.2)",borderRadius:4,padding:"1px 6px",letterSpacing:.8}},insiderSrc),
+              React.createElement('a',{href:insiderUrl,target:"_blank",rel:"noreferrer",style:{fontFamily:"var(--cond)",fontSize:9,color:"var(--blue)",textDecoration:"none",letterSpacing:.8}},"VIEW FILINGS ↗")
+            ),
+            insiderData.map((d,i)=>React.createElement('div',{key:i,style:{padding:"8px 0",borderBottom:i<insiderData.length-1?"1px solid var(--bg3)":"none",display:"flex",gap:10,alignItems:"flex-start"}},
+              React.createElement('span',{className:d.type==="BUY"?"pill-buy":"pill-sell"},d.type),
+              React.createElement('div',{style:{flex:1}},
+                React.createElement('div',{style:{display:"flex",justifyContent:"space-between"}},
+                  React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:700,fontSize:12}},d.name," ",React.createElement('span',{style:{color:"var(--text2)",fontWeight:400,fontSize:10}},d.role)),
+                  React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:10,fontWeight:700,color:d.type==="BUY"?"var(--em)":"var(--red)"}},d.value)
+                ),
+                React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:9,color:"var(--text3)",marginTop:2}},d.date," · ",f0(d.shares)," shares · Filed ",d.filed)
+              )
+            ))
+          )
+    ),
+
+    /* 6. Institutional Holdings */
+    React.createElement(SectionBlock,{title:"Institutional Holdings >2%",color:"var(--purple)",icon:"🏦",badge:instSrc,defaultOpen:false},
+      instData.length===0
+        ? React.createElement('div',{style:{padding:"10px 0",color:"var(--text2)",fontFamily:"var(--cond)",fontSize:11,letterSpacing:1}},"NO DATA AVAILABLE")
+        : React.createElement(React.Fragment,null,
+            React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}},
+              [["Inst. Owned",instTotal.toFixed(1)+"%","var(--purple)"],["No. of Firms",instData.length,"var(--text)"],["Activity",instBuys>instSells?"ACCUM":instBuys<instSells?"DIST":"NEUTRAL",instBuys>instSells?"var(--em)":instBuys<instSells?"var(--red)":"var(--gold)"]].map(([l,v,c])=>
+                React.createElement('div',{key:l,style:{background:"var(--bg3)",borderRadius:6,padding:"8px",textAlign:"center"}},
+                  React.createElement('div',{className:"th",style:{marginBottom:2}},l),
+                  React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:700,color:c}},v)
+                )
+              )
+            ),
+            React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+              React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:9,fontWeight:700,color:"var(--purple)",background:"var(--purple-dim)",border:"1px solid rgba(191,95,255,.2)",borderRadius:4,padding:"1px 6px",letterSpacing:.8}},instSrc+" · Quarterly · 45-day lag"),
+              React.createElement('a',{href:instUrl,target:"_blank",rel:"noreferrer",style:{fontFamily:"var(--cond)",fontSize:9,color:"var(--blue)",textDecoration:"none",letterSpacing:.8}},"VIEW FILINGS ↗")
+            ),
+            instData.map((d,i)=>{
+              const chgUp=d.change.startsWith("+");const chgN=d.change==="0.00%"||d.change==="0%";
+              return React.createElement('div',{key:i,style:{padding:"9px 0",borderBottom:i<instData.length-1?"1px solid var(--bg3)":"none"}},
+                React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3}},
+                  React.createElement('div',null,
+                    React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:700,fontSize:11,color:"var(--text)"}},d.name),
+                    React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:9,color:"var(--text2)",marginTop:1}},d.type," · ",d.filed)
+                  ),
+                  React.createElement('div',{style:{textAlign:"right"}},
+                    React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:12,fontWeight:700,color:"var(--purple)"}},d.pct+"%"),
+                    React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:9,color:chgN?"var(--text3)":chgUp?"var(--em)":"var(--red)"}},chgN?"No change":d.change+" QoQ")
+                  )
+                ),
+                React.createElement('div',{className:"inst-bar"},React.createElement('div',{style:{width:`${Math.min(d.pct,65)/65*100}%`,height:"100%",borderRadius:99,background:`linear-gradient(90deg,var(--purple),rgba(191,95,255,.4))`}})),
+                React.createElement('div',{style:{display:"flex",justifyContent:"flex-end",marginTop:3}},React.createElement('span',{className:d.stance==="BUY"?"pill-buy":d.stance==="SELL"?"pill-sell":"pill-hold",style:{fontSize:8}},d.stance))
+              );
+            })
+          )
+    ),
+
+    /* Footer links */
+    React.createElement('div',{style:{padding:"12px 16px",display:"flex",gap:8,flexWrap:"wrap"}},
+      isKLSE
+        ?[["Bursa Profile","var(--em)",`https://www.bursamalaysia.com/trade/trading_resources/listing_directory/company-profile?stock_code=${stock.symbol}`],["i3investor","var(--blue)",`https://klse.i3investor.com/servlets/stk/-/${stock.symbol}.html`],["TradingView","var(--gold)",`https://www.tradingview.com/chart/?symbol=MYX:${stock.symbol}`]]
+        :[["Yahoo Finance","var(--blue)",`https://finance.yahoo.com/quote/${stock.symbol}`],["SEC EDGAR","var(--orange)",`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${stock.symbol}&type=&dateb=&owner=include&count=10`],["TradingView","var(--gold)",`https://www.tradingview.com/chart/?symbol=${stock.symbol}`]]
+      ).map(([l,c,u])=>React.createElement('a',{key:l,href:u,target:"_blank",rel:"noreferrer",style:{fontFamily:"var(--cond)",fontSize:10,fontWeight:700,letterSpacing:.8,color:c,textDecoration:"none",background:c+"12",border:`1px solid ${c}28`,borderRadius:4,padding:"4px 10px"}},l+" ↗"))
+    )
+  );
+}
+
+/* ════════════════ PORTFOLIO TAB ════════════════ */
+function PortfolioTab(){
+  const [mkt,setMkt]=useState("klse");
+  const [showAdd,setShowAdd]=useState(false);
+  const [holdings,setHoldings]=useState({klse:STOCKS.filter(s=>s.type==="port"&&s.mkt==="KLSE"),us:STOCKS.filter(s=>s.type==="port"&&s.mkt!=="KLSE")});
+  const [form,setForm]=useState({symbol:"",name:"",qty:"",cost:"",div:"",broker:"RHB"});
+  const cur=holdings[mkt];
+  const cost=cur.reduce((a,p)=>a+p.avgCost*p.qty,0);
+  const val=cur.reduce((a,p)=>a+p.price*p.qty,0);
+  const gain=val-cost;
+  const divs=cur.reduce((a,p)=>a+(p.div||0)*p.qty,0);
+  const pre=mkt==="klse"?"RM ":"$ ";
+
+  const doAdd=()=>{
+    if(!form.symbol||!form.qty||!form.cost)return;
+    const np={id:Date.now(),symbol:form.symbol.toUpperCase(),name:form.name||form.symbol,mkt:mkt==="klse"?"KLSE":"NYSE",type:"port",price:+form.cost,prev:+form.cost,qty:+form.qty,avgCost:+form.cost,div:+form.div||0,broker:form.broker,rsi:50,macd:0,ma50:+form.cost,ma200:+form.cost,vol:1,avgVol:1,pe:null,pbv:1,eps:0,divYield:0,roe:0,debtEq:0,sector:"—",mcap:"—",revenue:"—",support:+form.cost*.95,resist:+form.cost*1.05};
+    setHoldings(h=>({...h,[mkt]:[...h[mkt],np]}));
+    setShowAdd(false);setForm({symbol:"",name:"",qty:"",cost:"",div:"",broker:"RHB"});
+  };
+
+  return React.createElement('div',{className:"fade-in"},
+    /* Market toggle */
+    React.createElement('div',{style:{display:"flex",gap:8,marginBottom:16}},
+      [["klse","🇲🇾 KLSE (RHB)"],["us","🇺🇸 US (Moomoo)"]].map(([id,lbl])=>
+        React.createElement('button',{key:id,className:"btn",onClick:()=>setMkt(id),style:{flex:1,padding:"10px 14px",borderRadius:8,fontSize:13,background:mkt===id?"var(--em)":"var(--bg3)",border:`1px solid ${mkt===id?"var(--em)":"var(--border)"}`,color:mkt===id?"#000":"var(--text2)"}},lbl)
+      ),
+      React.createElement('button',{className:"btn",onClick:()=>setShowAdd(v=>!v),style:{padding:"10px 16px",borderRadius:8,fontSize:14,background:"var(--em-dim)",border:"1px solid var(--border2)",color:"var(--em)"}},"＋")
+    ),
+    /* Stats */
+    React.createElement('div',{className:"stats4",style:{marginBottom:16}},
+      [["Market Value",pre+f2(val),"var(--text)","💼"],["Unrealised P&L",(gain>=0?"+":"")+f2(gain),gain>=0?"var(--em)":"var(--red)","📊"],["Annual Dividend",pre+f2(divs),"var(--gold)","💰"],["Div Yield",f2((divs/val)*100)+"%","var(--purple)","🎯"]].map(([l,v,c,icon])=>
+        React.createElement('div',{key:l,className:"card",style:{padding:"14px 16px"}},
+          React.createElement('div',{className:"th",style:{marginBottom:6}},l),
+          React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:18,fontWeight:700,color:c,wordBreak:"break-all"}},v)
+        )
+      )
+    ),
+    showAdd&&React.createElement('div',{className:"card",style:{padding:16,marginBottom:14,borderColor:"var(--border2)"}},
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:10}},
+        [["Symbol","symbol","text","AAPL"],["Company","name","text","Apple Inc"],["Qty","qty","number","100"],["Avg Cost","cost","number","150.00"],["Div/Share","div","number","0.96"]].map(([l,k,t,ph])=>
+          React.createElement('div',{key:k},React.createElement('div',{className:"th",style:{marginBottom:4}},l),React.createElement('input',{className:"inp",type:t,placeholder:ph,value:form[k],onChange:e=>setForm(f=>({...f,[k]:e.target.value}))}))
+        ),
+        React.createElement('div',null,React.createElement('div',{className:"th",style:{marginBottom:4}},"Broker"),React.createElement('select',{className:"inp",value:form.broker,onChange:e=>setForm(f=>({...f,broker:e.target.value}))},React.createElement('option',null,"RHB"),React.createElement('option',null,"Moomoo")))
+      ),
+      React.createElement('div',{style:{display:"flex",gap:8}},
+        React.createElement('button',{className:"btn",onClick:doAdd,style:{padding:"9px 20px",borderRadius:8,background:"var(--em)",color:"#000",fontSize:13}},"Add"),
+        React.createElement('button',{className:"btn",onClick:()=>setShowAdd(false),style:{padding:"9px 16px",borderRadius:8,background:"var(--bg3)",border:"1px solid var(--border)",color:"var(--text2)",fontSize:13}},"Cancel")
+      )
+    ),
+    /* Table */
+    React.createElement('div',{className:"card",style:{overflowX:"auto"}},
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1.2fr 1.2fr 1fr .8fr",padding:"10px 18px",borderBottom:"1px solid var(--border)",minWidth:640}},
+        ["Stock","Qty","Avg Cost","Price","Mkt Value","P&L","Div/yr","Broker"].map((h,i)=>React.createElement('div',{key:h,className:"th",style:{textAlign:i>0?"right":"left"}},h))
+      ),
+      cur.map((p,i)=>{
+        const g=(p.price-p.avgCost)*p.qty;const gp=((p.price-p.avgCost)/p.avgCost)*100;const up=g>=0;
+        return React.createElement('div',{key:p.id,style:{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1.2fr 1.2fr 1fr .8fr",padding:"13px 18px",borderBottom:i<cur.length-1?"1px solid var(--border)":"none",alignItems:"center",minWidth:640}},
+          React.createElement('div',null,React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:14}},p.symbol),React.createElement('div',{style:{fontSize:11,color:"var(--text2)"}},(p.name||"").substring(0,18))),
+          React.createElement('div',{style:{textAlign:"right",fontFamily:"var(--mono)",fontSize:12,color:"var(--text2)"}},f0(p.qty)),
+          React.createElement('div',{style:{textAlign:"right",fontFamily:"var(--mono)",fontSize:12,color:"var(--text3)"}},f2(p.avgCost)),
+          React.createElement('div',{style:{textAlign:"right",fontFamily:"var(--mono)",fontSize:12,fontWeight:600}},f2(p.price)),
+          React.createElement('div',{style:{textAlign:"right",fontFamily:"var(--mono)",fontSize:12}},f2(p.price*p.qty)),
+          React.createElement('div',{style:{textAlign:"right"}},React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:12,fontWeight:700,color:up?"var(--em)":"var(--red)"}},up?"+":"",f2(g)),React.createElement('div',{style:{fontSize:9,color:up?"var(--em)":"var(--red)"}},up?"+":"",f1(gp),"%")),
+          React.createElement('div',{style:{textAlign:"right",fontFamily:"var(--mono)",fontSize:12,color:"var(--gold)"}},f2((p.div||0)*p.qty)),
+          React.createElement('div',{style:{textAlign:"right"}},React.createElement('span',{className:"chip",style:{background:p.broker==="RHB"?"var(--blue-dim)":"var(--purple-dim)",color:p.broker==="RHB"?"var(--blue)":"var(--purple)",border:`1px solid ${p.broker==="RHB"?"rgba(0,180,255,.25)":"rgba(191,95,255,.25)"}`}},p.broker||"—"))
+        );
+      })
+    )
+  );
+}
+
+/* ════════════════ AGENT TAB ════════════════ */
+function AgentTab({addToast}){
+  const [sel,setSel]=useState(null);
+  const [rankFilter,setRankFilter]=useState("ALL");
+  const [mktFilter,setMktFilter]=useState("ALL");
+  const [scanning,setScanning]=useState(false);
+  const [lastScan,setLastScan]=useState(new Date());
+  const [nextScan,setNextScan]=useState(300);
+  const [scanCount,setScanCount]=useState(1);
+
+  const analyzed=STOCKS.map(s=>({...s,sig:computeSignal(s)}));
+  const filtered=analyzed.filter(s=>rankFilter==="ALL"||s.sig.rank===rankFilter).filter(s=>mktFilter==="ALL"||s.mkt===mktFilter).sort((a,b)=>b.sig.conf-a.sig.conf);
+  const selStock=sel?analyzed.find(s=>s.id===sel):null;
+
+  useEffect(()=>{
+    const t=setInterval(()=>setNextScan(n=>{if(n<=1){triggerScan();return 300;}return n-1;}),1000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const triggerScan=()=>{
+    setScanning(true);setScanCount(c=>c+1);setLastScan(new Date());
+    setTimeout(()=>{
+      setScanning(false);
+      const picks=analyzed.filter(s=>s.sig.rank==="BUY"||s.sig.rank==="SELL");
+      if(picks.length&&Math.random()>.4){
+        const p=picks[Math.floor(Math.random()*picks.length)];
+        addToast({symbol:p.symbol,mkt:p.mkt,rank:p.sig.rank,reason:p.sig.sigs[0]?.msg||"Signal detected",entry:fP(p.sig.entry,p.mkt),sl:fP(p.sig.sl,p.mkt),tp:fP(p.sig.tp1,p.mkt)});
+      }
+    },2200);
+  };
+
+  const counts={BUY:analyzed.filter(s=>s.sig.rank==="BUY").length,SELL:analyzed.filter(s=>s.sig.rank==="SELL").length,HOLD:analyzed.filter(s=>s.sig.rank==="HOLD").length,WATCH:analyzed.filter(s=>s.sig.rank==="WATCH").length};
+  const fmtNext=s=>{const m=Math.floor(s/60),sec=s%60;return m>0?`${m}m ${sec}s`:`${sec}s`;};
+
+  return React.createElement('div',{className:"fade-in"},
+    /* Agent status */
+    React.createElement('div',{className:"card",style:{padding:"11px 16px",marginBottom:12,borderColor:scanning?"var(--border2)":"var(--border)",boxShadow:scanning?"0 0 16px var(--em-dim)":"none",transition:"all .3s",position:"relative",overflow:"hidden"}},
+      scanning&&React.createElement('div',{style:{position:"absolute",top:0,left:"-100%",right:0,height:1,background:"linear-gradient(90deg,transparent,var(--em),transparent)",animation:"scanLine 1.5s linear infinite"}}),
+      React.createElement('style',null,"@keyframes scanLine{from{left:-100%}to{left:100%}}"),
+      React.createElement('div',{style:{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}},
+        React.createElement('div',{style:{display:"flex",alignItems:"center",gap:7}},
+          React.createElement('div',{className:"pulse",style:{width:7,height:7,borderRadius:"50%",background:scanning?"var(--gold)":"var(--em)",boxShadow:`0 0 8px ${scanning?"var(--gold)":"var(--em)"}`}}),
+          React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:12,color:scanning?"var(--gold)":"var(--em)",letterSpacing:1.2}},scanning?"SCANNING...":"AGENT ACTIVE")
+        ),
+        React.createElement('div',{style:{display:"flex",gap:16,flexWrap:"wrap"}},
+          [["Monitoring",analyzed.length+" stocks"],["Scans",scanCount],["Last",lastScan.toLocaleTimeString("en-MY",{hour12:false})],["Next",scanning?"now":fmtNext(nextScan)]].map(([l,v])=>
+            React.createElement('div',{key:l},React.createElement('div',{className:"th",style:{fontSize:8}},l),React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:600}},v))
+          )
+        ),
+        React.createElement('div',{style:{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}},
+          React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:9,color:"var(--text2)",letterSpacing:.5}},"▲ WATCHLIST  ◆ PORTFOLIO"),
+          React.createElement('button',{className:"btn",onClick:triggerScan,disabled:scanning,style:{padding:"7px 16px",borderRadius:6,fontSize:11,background:scanning?"var(--bg3)":"var(--em-dim)",border:`1px solid ${scanning?"var(--border)":"var(--border2)"}`,color:scanning?"var(--text2)":"var(--em)"}},scanning?"Scanning...":"▶ Scan Now")
+        )
+      )
+    ),
+    /* Signal banner */
+    React.createElement('div',{className:"card",style:{padding:"10px 16px",marginBottom:12,borderColor:"rgba(0,255,136,.15)",background:"rgba(0,255,136,.03)"}},
+      React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:11,color:"var(--em)",letterSpacing:1}},
+        "⚡ HOW TO ACT ON A SIGNAL: Tap any stock → Review signal → Open Moomoo or RHB TradeSmart → Enter the trade manually using the entry/SL/TP levels shown"
+      )
+    ),
+    /* Summary */
+    React.createElement('div',{className:"stats4",style:{marginBottom:12}},
+      [["BUY",counts.BUY,"var(--em)"],["SELL",counts.SELL,"var(--red)"],["HOLD",counts.HOLD,"var(--gold)"],["WATCH",counts.WATCH,"var(--blue)"]].map(([r,c,col])=>
+        React.createElement('div',{key:r,className:"card row-h",onClick:()=>setRankFilter(rankFilter===r?"ALL":r),style:{padding:"12px 14px",transition:"all .18s",borderColor:rankFilter===r?col+"55":"var(--border)",background:rankFilter===r?col+"08":"var(--panel)"}},
+          React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}},
+            React.createElement('span',{className:`chip rank-${r}`},r),
+            React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:20,fontWeight:700,color:col}},c)
+          ),
+          React.createElement('div',{className:"th",style:{fontSize:9}},"stocks")
+        )
+      )
+    ),
+    /* Main grid */
+    React.createElement('div',{className:"agent-grid"},
+      /* List */
+      React.createElement('div',null,
+        React.createElement('div',{style:{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap"}},
+          ["ALL","KLSE","NYSE","NASDAQ"].map(f=>React.createElement('button',{key:f,className:"btn",onClick:()=>setMktFilter(f),style:{padding:"4px 11px",borderRadius:5,fontSize:11,background:mktFilter===f?"var(--em)":"var(--bg3)",border:`1px solid ${mktFilter===f?"var(--em)":"var(--border)"}`,color:mktFilter===f?"#000":"var(--text2)"}},f))
+        ),
+        React.createElement('div',{className:"card",style:{overflow:"hidden"}},
+          React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1.8fr .8fr .7fr .7fr .6fr",padding:"9px 12px",borderBottom:"1px solid var(--border)",gap:4}},
+            ["Stock","Price","RSI/MACD","Score","Rank"].map((h,i)=>React.createElement('div',{key:h,className:"th",style:{textAlign:i>0?"right":"left"}},h))
+          ),
+          filtered.map((s,i)=>{
+            const isSel=sel===s.id;const rc=rankColor(s.sig.rank);const up=s.sig.chgPct>=0;
+            return React.createElement('div',{key:s.id,className:"row-h",onClick:()=>setSel(isSel?null:s.id),style:{display:"grid",gridTemplateColumns:"1.8fr .8fr .7fr .7fr .6fr",padding:"11px 12px",borderBottom:i<filtered.length-1?"1px solid var(--border)":"none",gap:4,alignItems:"center",background:isSel?rc+"09":"transparent",borderLeft:isSel?`2px solid ${rc}`:"2px solid transparent",transition:"all .12s"}},
+              React.createElement('div',null,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:5}},React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:13}},s.symbol),React.createElement('span',{style:{fontSize:8,color:s.type==="port"?"var(--purple)":"var(--em)"}},s.type==="port"?"◆":"▲")),React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:9,color:"var(--text2)"}},s.name.substring(0,16))),
+              React.createElement('div',{style:{textAlign:"right"}},React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:700}},f2(s.price)),React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:8,color:up?"var(--em)":"var(--red)"}},up?"+":"",f1(s.sig.chgPct),"%")),
+              React.createElement('div',{style:{textAlign:"right"}},React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:9,color:s.rsi>70?"var(--red)":s.rsi<30?"var(--em)":"var(--gold)"}},s.rsi),React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:9,color:s.macd>=0?"var(--em)":"var(--red)"}},s.macd>=0?"+":"",f1(s.macd))),
+              React.createElement('div',{style:{textAlign:"right"}},React.createElement('div',{className:"sig-bar",style:{marginBottom:2}},React.createElement('div',{className:"sig-fill",style:{width:`${s.sig.conf}%`,background:rc}})),React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:8,color:rc}},s.sig.conf,"%")),
+              React.createElement('div',{style:{textAlign:"right"}},React.createElement('span',{className:`chip rank-${s.sig.rank}`,style:{fontSize:8,padding:"1px 5px"}},s.sig.rank))
+            );
+          }),
+          filtered.length===0&&React.createElement('div',{style:{padding:"30px",textAlign:"center",color:"var(--text2)",fontFamily:"var(--cond)",fontSize:11,letterSpacing:1}},"NO STOCKS MATCH FILTER")
+        )
+      ),
+      /* Detail panel desktop */
+      React.createElement('div',{className:"hide-mob"},
+        selStock
+          ?React.createElement(SignalPanel,{stock:selStock,sig:selStock.sig,onClose:()=>setSel(null)})
+          :React.createElement('div',{className:"card",style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:360,gap:10}},
+            React.createElement('div',{style:{fontSize:28,opacity:.2}},"🎯"),
+            React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:13,color:"var(--text2)",letterSpacing:1}},"SELECT A STOCK"),
+            React.createElement('div',{style:{fontFamily:"var(--body)",fontSize:11,color:"var(--text3)",maxWidth:200,textAlign:"center",lineHeight:1.6}},"Tap any row for full signal analysis, trade levels, insider trades & institutional holdings")
+          )
+      )
+    ),
+    /* Mobile detail */
+    selStock&&React.createElement('div',{className:"mob-only",style:{marginTop:12}},React.createElement(SignalPanel,{stock:selStock,sig:selStock.sig,onClose:()=>setSel(null)}))
+  );
+}
+
+/* ════════════════ MARKET TAB ════════════════ */
+function MarketTab(){
+  const sources=[
+    {n:"Bursa Malaysia",url:"https://www.bursamalaysia.com/market_information/market_summary",icon:"🇲🇾",desc:"Official KLSE indices & top movers"},
+    {n:"i3investor",url:"https://klse.i3investor.com",icon:"📊",desc:"KLSE analysis, forums, financials"},
+    {n:"The Edge Markets",url:"https://www.theedgemarkets.com/markets",icon:"📰",desc:"Malaysia financial news"},
+    {n:"Bloomberg Markets",url:"https://www.bloomberg.com/markets",icon:"🌐",desc:"Global markets & macro analysis"},
+    {n:"Finviz Heatmap",url:"https://finviz.com/map.ashx",icon:"🗺️",desc:"US market heatmap & screener"},
+    {n:"Yahoo Finance",url:"https://finance.yahoo.com",icon:"💹",desc:"Earnings, options, US news"},
+    {n:"Moomoo News",url:"https://www.moomoo.com/news",icon:"🐄",desc:"News from your broker"},
+    {n:"Seeking Alpha",url:"https://seekingalpha.com",icon:"🔍",desc:"Deep-dive equity analysis"},
+  ];
+  return React.createElement('div',{className:"fade-in"},
+    /* Ticker */
+    React.createElement('div',{className:"card",style:{padding:"12px 0",marginBottom:16,overflow:"hidden",position:"relative"}},
+      React.createElement('div',{style:{position:"absolute",left:0,top:0,bottom:0,width:32,background:"linear-gradient(to right,var(--bg2),transparent)",zIndex:2,pointerEvents:"none"}}),
+      React.createElement('div',{style:{position:"absolute",right:0,top:0,bottom:0,width:32,background:"linear-gradient(to left,var(--bg2),transparent)",zIndex:2,pointerEvents:"none"}}),
+      React.createElement('div',{className:"ticker-inner",style:{paddingLeft:16}},
+        [...INDICES,...INDICES].map((idx,i)=>React.createElement('div',{key:i,style:{display:"flex",alignItems:"center",gap:10,whiteSpace:"nowrap"}},
+          React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:10,color:"var(--text2)",fontWeight:700,letterSpacing:1}},idx.n),
+          React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:700}},idx.v),
+          React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:10,fontWeight:700,color:idx.up?"var(--em)":"var(--red)"}},idx.c),
+          React.createElement('span',{style:{color:"var(--text3)",marginLeft:8}},"·")
+        ))
+      )
+    ),
+    /* Index cards */
+    React.createElement('div',{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:20}},
+      INDICES.map(idx=>React.createElement('div',{key:idx.n,className:"card",style:{padding:"12px 14px",borderColor:idx.up?"rgba(0,255,136,.15)":"rgba(255,45,85,.15)"}},
+        React.createElement('div',{className:"th",style:{marginBottom:4}},idx.n),
+        React.createElement('div',{style:{fontFamily:"var(--mono)",fontWeight:700,fontSize:15,marginBottom:2}},idx.v),
+        React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:10,fontWeight:700,color:idx.up?"var(--em)":"var(--red)"}},idx.c)
+      ))
+    ),
+    React.createElement('div',{className:"th",style:{marginBottom:10}},"MARKET DATA SOURCES"),
+    React.createElement('div',{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:8}},
+      sources.map(s=>React.createElement('a',{key:s.n,href:s.url,target:"_blank",rel:"noreferrer",style:{textDecoration:"none"}},
+        React.createElement('div',{className:"card",style:{padding:"14px 16px",cursor:"pointer",transition:"all .18s"},
+          onMouseEnter:e=>{e.currentTarget.style.borderColor="rgba(0,255,136,.3)";e.currentTarget.style.background="var(--em-dim)";},
+          onMouseLeave:e=>{e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.background="var(--panel)";}},
+          React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8,marginBottom:4}},React.createElement('span',{style:{fontSize:16}},s.icon),React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:700,fontSize:13}},s.n),React.createElement('span',{style:{marginLeft:"auto",color:"var(--em)",fontSize:12}},"↗")),
+          React.createElement('div',{style:{fontSize:11,color:"var(--text2)"}},s.desc)
+        )
+      ))
+    )
+  );
+}
+
+/* ════════════════ GURUS TAB ════════════════ */
+function GurusTab(){
+  const [sel,setSel]=useState("buffett");
+  const g=GURUS_DATA[sel];
+  return React.createElement('div',{className:"fade-in"},
+    React.createElement('div',{style:{display:"flex",gap:8,marginBottom:16}},
+      Object.entries(GURUS_DATA).map(([k,v])=>
+        React.createElement('button',{key:k,className:"btn",onClick:()=>setSel(k),style:{flex:1,padding:"10px 8px",borderRadius:10,fontSize:11,fontWeight:700,background:sel===k?v.color+"20":"var(--bg3)",border:`1px solid ${sel===k?v.color+"55":"var(--border)"}`,color:sel===k?v.color:"var(--text2)"}},
+          React.createElement('span',{style:{fontSize:18,display:"block",marginBottom:3}},v.emoji),v.name.split(" ")[0]
+        )
+      )
+    ),
+    React.createElement('div',{className:"card",style:{padding:"18px 20px",marginBottom:12,borderColor:g.color+"33"}},
+      React.createElement('div',{style:{display:"flex",alignItems:"flex-start",gap:12,flexWrap:"wrap"}},
+        React.createElement('div',{style:{width:46,height:46,borderRadius:"50%",background:g.color+"22",border:`2px solid ${g.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}},g.emoji),
+        React.createElement('div',{style:{flex:1,minWidth:160}},
+          React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:17}},g.name),
+          React.createElement('div',{style:{fontSize:12,fontWeight:600,color:g.color,marginBottom:4}},g.label),
+          React.createElement('div',{style:{fontSize:12,color:"var(--text2)",lineHeight:1.5}},g.bio)
+        ),
+        React.createElement('div',{style:{display:"flex",gap:8,flexShrink:0}},
+          React.createElement('div',{style:{background:g.color+"15",borderRadius:8,padding:"8px 12px",textAlign:"center"}},React.createElement('div',{className:"th",style:{color:g.color,marginBottom:2}},"EST. CAGR"),React.createElement('div',{style:{fontFamily:"var(--mono)",fontWeight:700,color:g.color,fontSize:13}},g.cagr)),
+          React.createElement('div',{style:{background:"var(--bg3)",borderRadius:8,padding:"8px 12px",textAlign:"center"}},React.createElement('div',{className:"th",style:{marginBottom:2}},"STYLE"),React.createElement('div',{style:{fontSize:11,fontWeight:700}},g.style))
+        )
+      )
+    ),
+    React.createElement('div',{className:"card",style:{overflow:"hidden",marginBottom:12}},
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 2fr 1fr",padding:"10px 18px",borderBottom:"1px solid var(--border)"}},
+        ["Symbol","Weight","Est. Value"].map((h,i)=>React.createElement('div',{key:h,className:"th",style:{textAlign:i===1?"center":"left"}},h))
+      ),
+      g.h.map((h,i)=>React.createElement('div',{key:h.s,style:{display:"grid",gridTemplateColumns:"1fr 2fr 1fr",padding:"12px 18px",borderBottom:i<g.h.length-1?"1px solid var(--border)":"none",alignItems:"center",gap:12}},
+        React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:14}},h.s),
+        React.createElement('div',null,React.createElement('div',{style:{height:4,borderRadius:99,background:"var(--bg3)",overflow:"hidden"}},React.createElement('div',{style:{width:`${h.p}%`,height:"100%",borderRadius:99,background:`linear-gradient(90deg,${g.color},${g.color}88)`,transition:"width 1s cubic-bezier(.16,1,.3,1)"}})},React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:9,color:g.color,marginTop:2}},h.p,"%")),
+        React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,color:"var(--text2)"}},h.v)
+      ))
+    ),
+    React.createElement('a',{href:g.url,target:"_blank",rel:"noreferrer",style:{textDecoration:"none"}},
+      React.createElement('div',{className:"card",style:{padding:"12px 16px",textAlign:"center",cursor:"pointer",borderColor:g.color+"33"}},React.createElement('div',{style:{fontWeight:700,color:g.color,fontSize:13}},g.emoji," View ",g.name,"'s Full Portfolio ↗"))
+    )
+  );
+}
+
+/* ════════════════ TRANSACTIONS TAB ════════════════ */
+function TransactionsTab(){
+  const [txns,setTxns]=useState(TXNS_INIT);
+  const [show,setShow]=useState(false);
+  const [form,setForm]=useState({date:"",type:"BUY",symbol:"",qty:"",price:"",broker:"RHB"});
+  const tStyle={BUY:{bg:"var(--em-dim)",c:"var(--em)",b:"rgba(0,255,136,.3)"},SELL:{bg:"var(--red-dim)",c:"var(--red)",b:"rgba(255,45,85,.3)"},DIV:{bg:"var(--gold-dim)",c:"var(--gold)",b:"rgba(255,184,0,.3)"}};
+  const doAdd=()=>{if(!form.date||!form.symbol||!form.price)return;setTxns(t=>[{...form,qty:+form.qty,price:+form.price},...t]);setShow(false);};
+  return React.createElement('div',{className:"fade-in"},
+    React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},
+      React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:16,letterSpacing:.5}},"TRANSACTION LOG"),
+      React.createElement('button',{className:"btn",onClick:()=>setShow(v=>!v),style:{padding:"9px 16px",borderRadius:8,fontSize:12,background:"var(--em-dim)",border:"1px solid var(--border2)",color:"var(--em)"}},"＋ Log Trade")
+    ),
+    show&&React.createElement('div',{className:"card",style:{padding:16,marginBottom:14,borderColor:"var(--border2)"}},
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:10}},
+        [["Date","date","date","2024-05-01"],["Symbol","symbol","text","AAPL"],["Qty","qty","number","100"],["Price","price","number","150.00"]].map(([l,k,t,ph])=>
+          React.createElement('div',{key:k},React.createElement('div',{className:"th",style:{marginBottom:4}},l),React.createElement('input',{className:"inp",type:t,placeholder:ph,value:form[k],onChange:e=>setForm(f=>({...f,[k]:e.target.value}))}))
+        ),
+        React.createElement('div',null,React.createElement('div',{className:"th",style:{marginBottom:4}},"Type"),React.createElement('select',{className:"inp",value:form.type,onChange:e=>setForm(f=>({...f,type:e.target.value}))},React.createElement('option',null,"BUY"),React.createElement('option',null,"SELL"),React.createElement('option',null,"DIV"))),
+        React.createElement('div',null,React.createElement('div',{className:"th",style:{marginBottom:4}},"Broker"),React.createElement('select',{className:"inp",value:form.broker,onChange:e=>setForm(f=>({...f,broker:e.target.value}))},React.createElement('option',null,"RHB"),React.createElement('option',null,"Moomoo")))
+      ),
+      React.createElement('div',{style:{display:"flex",gap:8}},
+        React.createElement('button',{className:"btn",onClick:doAdd,style:{padding:"9px 20px",borderRadius:8,background:"var(--em)",color:"#000",fontSize:13}},"Save"),
+        React.createElement('button',{className:"btn",onClick:()=>setShow(false),style:{padding:"9px 14px",borderRadius:8,background:"var(--bg3)",border:"1px solid var(--border)",color:"var(--text2)",fontSize:13}},"Cancel")
+      )
+    ),
+    txns.map((t,i)=>{
+      const ts=tStyle[t.type]||{bg:"var(--bg3)",c:"var(--text2)",b:"var(--border)"};
+      return React.createElement('div',{key:i,className:"card",style:{padding:"13px 16px",marginBottom:8,borderLeft:`3px solid ${ts.c}`,borderColor:`var(--border) var(--border) var(--border) ${ts.c}`}},
+        React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}},
+          React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}},
+            React.createElement('span',{className:"chip",style:{background:ts.bg,color:ts.c,border:`1px solid ${ts.b}`}},t.type),
+            React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:15}},t.symbol),
+            React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:10,color:t.broker==="RHB"?"var(--blue)":"var(--purple)"}},t.broker)
+          ),
+          React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:10,color:"var(--text2)"}},t.date)
+        ),
+        React.createElement('div',{style:{display:"flex",gap:16}},
+          t.qty>0&&React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:11,color:"var(--text2)"}},f0(t.qty)," shares"),
+          React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:13,fontWeight:700,color:ts.c}},f2(t.price))
+        )
+      );
+    })
+  );
+}
+
+/* ════════════════ ALERTS TAB ════════════════ */
+function AlertsTab(){
+  const alerts=[
+    {time:"14:32",symbol:"PLTR",mkt:"NYSE",rank:"BUY",conf:78,reason:"MACD bullish cross + RSI 68. Breaking above $22.50 resistance. → Open Moomoo → Buy PLTR",entry:"$22.71",sl:"$21.42",tp:"$24.60",insider:"President bought $9.3M last month",inst:"ARK increased +1.20%"},
+    {time:"12:15",symbol:"RHBBANK",mkt:"KLSE",rank:"BUY",conf:71,reason:"Above 50MA & 200MA. Div yield 5.8%. → Open RHB TradeSmart → Buy RHBBANK",entry:"RM 5.79",sl:"RM 5.47",tp:"RM 6.27",insider:"Chairman & CEO both buying",inst:"EPF increased +0.14%"},
+    {time:"10:48",symbol:"TOPGLV",mkt:"KLSE",rank:"WATCH",conf:55,reason:"RSI 31 — approaching oversold. Wait for reversal confirmation before entering.",entry:"RM 0.79",sl:"RM 0.74",tp:"RM 0.86",insider:"Exec Chairman buying heavily",inst:"EPF & KWAP reducing"},
+    {time:"09:30",symbol:"NVDA",mkt:"NASDAQ",rank:"HOLD",conf:61,reason:"Overbought RSI 74. Strong fundamentals — wait for pullback before adding via Moomoo.",entry:"$875",sl:"$823",tp:"$945",insider:"CEO sold $208M — caution",inst:"Fidelity increased +0.45%"},
+    {time:"Yesterday",symbol:"TSLA",mkt:"NASDAQ",rank:"SELL",conf:68,reason:"Below 50MA & 200MA. Negative MACD. → Consider reducing position via Moomoo.",entry:"$180",sl:"$189",tp:"$155",insider:"CEO sold $901M",inst:"Baillie Gifford reduced -0.94%"},
+  ];
+  return React.createElement('div',{className:"fade-in"},
+    React.createElement('div',{style:{marginBottom:14}},
+      React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:16,letterSpacing:.5}},"SIGNAL ALERTS HISTORY"),
+      React.createElement('div',{className:"th",style:{marginTop:2}},"All signals with execution guidance for Moomoo / RHB TradeSmart")
+    ),
+    alerts.map((a,i)=>{
+      const rc=rankColor(a.rank);
+      return React.createElement('div',{key:i,className:"card",style:{padding:"14px 16px",marginBottom:10,borderLeft:`3px solid ${rc}`,borderColor:`var(--border) var(--border) var(--border) ${rc}`}},
+        React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}},
+          React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}},
+            React.createElement('span',{className:`chip rank-${a.rank}`},a.rank),
+            React.createElement('span',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:15}},a.symbol),
+            React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:10,color:"var(--blue)"}},a.mkt)
+          ),
+          React.createElement('div',{style:{display:"flex",gap:8,alignItems:"center"}},
+            React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:9,color:rc}},a.conf,"%"),
+            React.createElement('span',{style:{fontFamily:"var(--mono)",fontSize:9,color:"var(--text2)"}},a.time)
+          )
+        ),
+        React.createElement('div',{style:{fontSize:11,color:"var(--text)",lineHeight:1.5,marginBottom:8}},a.reason),
+        React.createElement('div',{style:{display:"flex",gap:12,marginBottom:8,flexWrap:"wrap"}},
+          [["Entry",a.entry,rc],["Stop Loss",a.sl,"var(--red)"],["Target",a.tp,"var(--em)"]].map(([l,v,c])=>
+            React.createElement('div',{key:l},React.createElement('div',{className:"th",style:{fontSize:8,marginBottom:1}},l),React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:11,fontWeight:700,color:c}},v))
+          )
+        ),
+        React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap"}},
+          React.createElement('div',{style:{background:"var(--orange-dim)",border:"1px solid rgba(255,124,42,.2)",borderRadius:5,padding:"3px 8px"}},React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:8,color:"var(--orange)",letterSpacing:1}},"INSIDER  "),React.createElement('span',{style:{fontSize:10,color:"var(--text)"}},a.insider)),
+          React.createElement('div',{style:{background:"var(--purple-dim)",border:"1px solid rgba(191,95,255,.2)",borderRadius:5,padding:"3px 8px"}},React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:8,color:"var(--purple)",letterSpacing:1}},"INSTITUTION  "),React.createElement('span',{style:{fontSize:10,color:"var(--text)"}},a.inst))
+        )
+      );
+    })
+  );
+}
+
+/* ════════════════ MAIN APP ════════════════ */
+const TABS=[
+  {id:"agent",label:"Agent",icon:"🤖",short:"Agent"},
+  {id:"portfolio",label:"Portfolio",icon:"📈",short:"Port."},
+  {id:"market",label:"Market",icon:"🌐",short:"Market"},
+  {id:"gurus",label:"Gurus",icon:"🧠",short:"Gurus"},
+  {id:"transactions",label:"Transactions",icon:"📋",short:"Trades"},
+  {id:"alerts",label:"Alerts",icon:"🔔",short:"Alerts"},
+];
+
+let toastId=0;
+function App(){
+  const [tab,setTab]=useState("agent");
+  const [tick,setTick]=useState(new Date());
+  const [toasts,setToasts]=useState([]);
+
+  useEffect(()=>{const t=setInterval(()=>setTick(new Date()),1000);return()=>clearInterval(t);},[]);
+
+  const addToast=useCallback((msg)=>{
+    const id=++toastId;
+    setToasts(t=>[...t.slice(-3),{...msg,id}]);
+    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),5000);
+  },[]);
+
+  const klseOpen=tick.getHours()>=9&&tick.getHours()<17;
+  const usOpen=tick.getHours()>=21||tick.getHours()<4;
+
+  const klse=STOCKS.filter(s=>s.type==="port"&&s.mkt==="KLSE");
+  const us=STOCKS.filter(s=>s.type==="port"&&s.mkt!=="KLSE");
+  const klseVal=klse.reduce((a,p)=>a+p.price*p.qty,0);
+  const usVal=us.reduce((a,p)=>a+p.price*p.qty,0);
+  const klseCost=klse.reduce((a,p)=>a+p.avgCost*p.qty,0);
+  const usCost=us.reduce((a,p)=>a+p.avgCost*p.qty,0);
+  const totalMyr=klseVal+usVal*USD;
+  const totalGain=(klseVal-klseCost)+(usVal-usCost)*USD;
+  const totalCost=klseCost+usCost*USD;
+
+  const renderTab=()=>{
+    if(tab==="agent")        return React.createElement(AgentTab,{addToast});
+    if(tab==="portfolio")    return React.createElement(PortfolioTab);
+    if(tab==="market")       return React.createElement(MarketTab);
+    if(tab==="gurus")        return React.createElement(GurusTab);
+    if(tab==="transactions") return React.createElement(TransactionsTab);
+    if(tab==="alerts")       return React.createElement(AlertsTab);
+    return null;
+  };
+
+  return React.createElement(React.Fragment,null,
+    /* Ambient bg */
+    React.createElement('div',{style:{position:"fixed",inset:0,zIndex:0,overflow:"hidden",pointerEvents:"none"}},
+      React.createElement('div',{style:{position:"absolute",top:-300,left:-200,width:800,height:800,borderRadius:"50%",background:"radial-gradient(circle,rgba(0,255,136,.03) 0%,transparent 60%)"}}),
+      React.createElement('div',{style:{position:"absolute",bottom:-200,right:-100,width:600,height:600,borderRadius:"50%",background:"radial-gradient(circle,rgba(0,180,255,.02) 0%,transparent 60%)"}}),
+      React.createElement('div',{style:{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(0,255,136,.012) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.012) 1px,transparent 1px)",backgroundSize:"60px 60px"}})
+    ),
+
+    React.createElement('div',{style:{position:"relative",zIndex:1,minHeight:"100vh",display:"flex",flexDirection:"column"}},
+
+      /* HEADER */
+      React.createElement('header',{style:{background:"rgba(3,5,7,.96)",borderBottom:"1px solid var(--border2)",backdropFilter:"blur(20px)",position:"sticky",top:0,zIndex:100,flexShrink:0}},
+        React.createElement('div',{className:"hdr-inner",style:{maxWidth:1400,margin:"0 auto",padding:"11px 22px",display:"flex",alignItems:"center",gap:14}},
+          /* Logo */
+          React.createElement('div',{style:{display:"flex",alignItems:"center",gap:9,flexShrink:0}},
+            React.createElement('div',{style:{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,#00ff88,#00b4ff)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,boxShadow:"0 0 18px rgba(0,255,136,.35)"}},"📊"),
+            React.createElement('div',null,
+              React.createElement('div',{style:{fontFamily:"var(--cond)",fontWeight:800,fontSize:18,letterSpacing:2,color:"var(--em)",textShadow:"0 0 18px var(--em-glow)"}},"NEXUS"),
+              React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:8,color:"var(--text2)",letterSpacing:2}},"INVESTMENT INTELLIGENCE")
+            )
+          ),
+          /* Desktop nav */
+          React.createElement('nav',{className:"top-nav",style:{gap:2,background:"rgba(13,20,32,.8)",borderRadius:8,padding:3,marginLeft:10,border:"1px solid var(--border)",flexWrap:"wrap"}},
+            TABS.map(t=>React.createElement('button',{key:t.id,className:"btn",onClick:()=>setTab(t.id),style:{padding:"6px 13px",borderRadius:6,fontSize:11,letterSpacing:.5,background:tab===t.id?"var(--em)":"transparent",color:tab===t.id?"#000":"var(--text2)",border:"none",fontFamily:"var(--cond)",fontWeight:700}},t.icon," ",t.label))
+          ),
+          /* Status */
+          React.createElement('div',{style:{marginLeft:"auto",display:"flex",gap:12,alignItems:"center",flexShrink:0}},
+            [["KLSE",klseOpen],["US",usOpen]].map(([l,open])=>
+              React.createElement('div',{key:l,style:{display:"flex",alignItems:"center",gap:4}},
+                React.createElement('div',{className:"pulse",style:{width:5,height:5,borderRadius:"50%",background:open?"var(--em)":"var(--red)"}}),
+                React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:9,color:"var(--text2)",letterSpacing:1,fontWeight:700}},l," ",open?"LIVE":"CLOSED")
+              )
+            ),
+            React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:10,color:"var(--text2)"}},tick.toLocaleTimeString("en-MY",{hour12:false}))
+          )
+        ),
+        /* Summary bar */
+        React.createElement('div',{style:{background:"rgba(3,5,7,.8)",borderTop:"1px solid var(--border)"}},
+          React.createElement('div',{style:{maxWidth:1400,margin:"0 auto",padding:"8px 22px",display:"flex",gap:20,alignItems:"center",overflowX:"auto",scrollbarWidth:"none"}},
+            [
+              {l:"Total Portfolio",v:"RM "+f2(totalMyr),c:"var(--text)"},
+              {l:"Unrealised P&L",v:(totalGain>=0?"+":"")+"RM "+f2(totalGain)+" ("+(totalGain>=0?"+":"")+f1((totalGain/totalCost)*100)+"%)",c:totalGain>=0?"var(--em)":"var(--red)"},
+              {l:"KLSE (RHB)",v:"RM "+f2(klseVal),c:"var(--blue)"},
+              {l:"US (Moomoo)",v:"$ "+f2(usVal),c:"var(--purple)"},
+              {l:"Signals Today",v:STOCKS.filter(s=>computeSignal(s).rank==="BUY").length+" BUY  "+STOCKS.filter(s=>computeSignal(s).rank==="SELL").length+" SELL",c:"var(--gold)"},
+            ].map(({l,v,c})=>React.createElement('div',{key:l,style:{flexShrink:0}},
+              React.createElement('div',{style:{fontFamily:"var(--cond)",fontSize:8,color:"var(--text3)",letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:1}},l),
+              React.createElement('div',{style:{fontFamily:"var(--mono)",fontSize:12,fontWeight:700,color:c,whiteSpace:"nowrap"}},v)
+            ))
+          )
+        )
+      ),
+
+      /* MAIN */
+      React.createElement('main',{className:"main-wrap",style:{maxWidth:1400,margin:"0 auto",width:"100%",padding:"18px 22px",flex:1}},
+        renderTab()
+      ),
+
+      /* MOBILE NAV */
+      React.createElement('nav',{className:"bottom-nav"},
+        TABS.map(t=>React.createElement('button',{key:t.id,className:"btn",onClick:()=>setTab(t.id),style:{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 0",flex:1,background:"transparent",border:"none",color:tab===t.id?"var(--em)":"var(--text2)"}},
+          React.createElement('span',{style:{fontSize:18}},t.icon),
+          React.createElement('span',{style:{fontFamily:"var(--cond)",fontSize:8,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}},t.short),
+          tab===t.id&&React.createElement('div',{style:{width:16,height:2,background:"var(--em)",borderRadius:99}})
+        ))
+      )
+    ),
+
+    /* TOASTS */
+    React.createElement('div',{style:{position:"fixed",top:76,right:14,zIndex:2000,display:"flex",flexDirection:"column",gap:8}},
+      toasts.map(t=>React.createElement(Toast,{key:t.id,t}))
+    )
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
